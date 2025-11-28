@@ -1,2 +1,4 @@
-# No external dependencies needed for Vercel
-# Using only Python standard library
+flask==3.0.0
+flask-cors==4.0.0
+httpx==0.25.2
+gunicorn==21.2.0
