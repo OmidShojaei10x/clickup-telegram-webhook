@@ -1,33 +1,41 @@
-# ClickUp Telegram Webhook 🔔
+# ClickUp Telegram Bot 🔔
 
-سرور webhook برای ارسال نوتیفیکیشن‌های ClickUp به تلگرام
+نوتیفیکیشن کامنت‌های ClickUp به تلگرام - **فقط با GitHub Actions**
 
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/clickup-webhook?referralCode=omid)
+## 🚀 راه‌اندازی
 
-## 🚀 Deploy با یک کلیک
+### مرحله 1: Fork کنید
+این repository را Fork کنید.
 
-روی دکمه بالا کلیک کنید و این Environment Variables را وارد کنید:
+### مرحله 2: تنظیم Secrets
+به Settings → Secrets and variables → Actions بروید و این‌ها را اضافه کنید:
 
-| Variable | Value |
-|----------|-------|
+| Secret | مقدار |
+|--------|-------|
 | `TELEGRAM_BOT_TOKEN` | توکن بات تلگرام |
 | `TELEGRAM_CHAT_ID` | آیدی چت تلگرام |
 | `CLICKUP_API_TOKEN` | توکن API کلیک‌آپ |
+| `CLICKUP_TEAM_ID` | آیدی تیم کلیک‌آپ |
 
-## 📌 Endpoints
+### مرحله 3: فعال کردن Actions
+به تب Actions بروید و workflow را فعال کنید.
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/` | GET | اطلاعات سرور |
-| `/webhook` | POST | دریافت webhook از ClickUp |
-| `/health` | GET | بررسی سلامت سرور |
-| `/test` | GET | تست ارسال پیام |
+## ⚙️ نحوه کار
 
-## 🔧 تنظیم ClickUp
+- هر **5 دقیقه** کامنت‌های جدید چک می‌شوند
+- اگر کامنت جدیدی باشد، به تلگرام ارسال می‌شود
+- تاریخ **شمسی** نمایش داده می‌شود
 
-بعد از deploy، URL را در ClickUp Automation وارد کنید:
+## 📱 نمونه پیام
+
 ```
-https://YOUR-APP.up.railway.app/webhook
+📋 در تسک «نام تسک»
+
+👤 کاربر نوشته:
+
+💬 متن کامنت
+
+🕐 ۸ آذر ۱۴۰۳ - ساعت ۱۲:۳۰
 ```
 
 ## 📝 License
