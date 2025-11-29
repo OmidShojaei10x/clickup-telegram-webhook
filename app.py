@@ -1,7 +1,10 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os, json, urllib.request, urllib.parse
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+
+# تایم‌زون ایران (UTC+3:30)
+IRAN_TZ = timezone(timedelta(hours=3, minutes=30))
 
 app = Flask(__name__)
 CORS(app)
@@ -26,12 +29,14 @@ def fmt(ts):
     try:
         ts=int(ts)
         if ts>1e10:ts/=1000
-        dt=datetime.fromtimestamp(ts)
+        # تبدیل به وقت ایران
+        dt=datetime.fromtimestamp(ts, tz=timezone.utc).astimezone(IRAN_TZ)
         jy,jm,jd=jalali(dt.year,dt.month,dt.day)
         m=["فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند"]
         return f"{jd} {m[jm-1]} {jy} - ساعت {dt.strftime('%H:%M')}"
     except:
-        now=datetime.now()
+        # زمان فعلی به وقت ایران
+        now=datetime.now(IRAN_TZ)
         jy,jm,jd=jalali(now.year,now.month,now.day)
         m=["فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند"]
         return f"{jd} {m[jm-1]} {jy} - ساعت {now.strftime('%H:%M')}"
