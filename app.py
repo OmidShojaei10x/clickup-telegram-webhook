@@ -59,28 +59,23 @@ def get_task(task_id):
     except:return None
 
 def is_facility_task(task_data):
-    """چک کردن اینکه آیا requestor این تسک team facility است"""
+    """چک کردن اینکه آیا requestor این تسک Facility است"""
     if not task_data:return False
     custom_fields = task_data.get('custom_fields', [])
     for field in custom_fields:
         field_name = field.get('name', '').lower()
-        if 'requestor' in field_name or 'درخواست' in field_name:
-            # چک کردن مقدار فیلد
+        if 'requestor' in field_name:
             value = field.get('value')
-            type_config = field.get('type_config', {})
-            options = type_config.get('options', [])
+            options = field.get('type_config', {}).get('options', [])
             
-            # اگر dropdown است
-            if isinstance(value, int) and options:
+            # dropdown با مقدار عددی (orderindex)
+            if value is not None and options:
                 for opt in options:
                     if opt.get('orderindex') == value:
                         opt_name = opt.get('name', '').lower()
-                        if 'facility' in opt_name or 'فسیلیتی' in opt_name:
+                        # Facility با orderindex=1
+                        if opt_name == 'facility':
                             return True
-            # اگر متنی است
-            elif isinstance(value, str):
-                if 'facility' in value.lower() or 'فسیلیتی' in value.lower():
-                    return True
     return False
 
 @app.route("/")
