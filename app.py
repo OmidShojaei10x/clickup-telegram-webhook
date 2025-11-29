@@ -48,6 +48,39 @@ def send_telegram(text, chat_id=None):
     try:urllib.request.urlopen(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",d,timeout=10)
     except:pass
 
+def send_photo(photo_url, caption, chat_id=None):
+    """ارسال عکس به تلگرام"""
+    if not TELEGRAM_BOT_TOKEN:return
+    target_chat = chat_id or TELEGRAM_CHAT_ID
+    d=urllib.parse.urlencode({'chat_id':target_chat,'photo':photo_url,'caption':caption,'parse_mode':'Markdown'}).encode()
+    try:urllib.request.urlopen(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto",d,timeout=30)
+    except:pass
+
+def get_images_from_comment(comment):
+    """استخراج URL تصاویر از کامنت"""
+    images = []
+    comment_parts = comment.get('comment', [])
+    if isinstance(comment_parts, list):
+        for part in comment_parts:
+            if part.get('type') == 'image':
+                img = part.get('image', {})
+                url = img.get('thumbnail_large') or img.get('url')
+                if url:
+                    images.append(url)
+    return images
+
+def get_text_from_comment(comment):
+    """استخراج متن بدون نام فایل تصویر"""
+    text_parts = []
+    comment_parts = comment.get('comment', [])
+    if isinstance(comment_parts, list):
+        for part in comment_parts:
+            if part.get('type') != 'image':
+                txt = part.get('text', '').strip()
+                if txt and not txt.endswith('.png') and not txt.endswith('.jpg'):
+                    text_parts.append(txt)
+    return ' '.join(text_parts).strip() or comment.get('comment_text', '')
+
 def get_comment(task_id):
     if not CLICKUP_API_TOKEN:return None
     try:
@@ -104,16 +137,33 @@ def webhook():
         
         if c:
             u=c.get("user",{})
-            msg=f"🟢 **تسک:** {name}\n\n💬 **کامنت:** {c.get('comment_text','')}\n\n👤 **نوشته:** {u.get('username') or u.get('email','?')}\n\n🕐 **تاریخ:** {fmt(c.get('date'))}"
+            images = get_images_from_comment(c)
+            comment_text = get_text_from_comment(c)
+            
+            # اگر فقط عکس بود بدون متن
+            if not comment_text and images:
+                comment_text = "📷 تصویر"
+            
+            msg=f"🟢 **تسک:** {name}\n\n💬 **کامنت:** {comment_text}\n\n👤 **نوشته:** {u.get('username') or u.get('email','?')}\n\n🕐 **تاریخ:** {fmt(c.get('date'))}"
+            
+            is_facility = is_facility_task(task_data)
+            
+            # ارسال متن
+            send_telegram(msg)
+            if is_facility:
+                send_telegram(msg, TELEGRAM_GROUP_FACILITY)
+            
+            # ارسال تصاویر
+            for img_url in images:
+                caption = f"📋 {name}"
+                send_photo(img_url, caption)
+                if is_facility:
+                    send_photo(img_url, caption, TELEGRAM_GROUP_FACILITY)
         else:
             msg=f"🔔 **فعالیت جدید**\n\n📋 **تسک:** {name}\n\n🕐 {fmt(None)}"
-        
-        # همیشه به چت اصلی ارسال کن
-        send_telegram(msg)
-        
-        # اگر requestor تیم facility است، به گروه هم ارسال کن
-        if is_facility_task(task_data):
-            send_telegram(msg, TELEGRAM_GROUP_FACILITY)
+            send_telegram(msg)
+            if is_facility_task(task_data):
+                send_telegram(msg, TELEGRAM_GROUP_FACILITY)
             
     elif "body" in data:
         send_telegram(f"🧪 **تست Webhook**\n\n✅ سرور فعال است!\n\n🕐 {fmt(None)}")
