@@ -139,6 +139,7 @@ def webhook():
             u=c.get("user",{})
             images = get_images_from_comment(c)
             comment_text = get_text_from_comment(c)
+            is_facility = is_facility_task(task_data)
             
             # اگر فقط عکس بود بدون متن
             if not comment_text and images:
@@ -146,19 +147,17 @@ def webhook():
             
             msg=f"🟢 **تسک:** {name}\n\n💬 **کامنت:** {comment_text}\n\n👤 **نوشته:** {u.get('username') or u.get('email','?')}\n\n🕐 **تاریخ:** {fmt(c.get('date'))}"
             
-            is_facility = is_facility_task(task_data)
-            
-            # ارسال متن
-            send_telegram(msg)
-            if is_facility:
-                send_telegram(msg, TELEGRAM_GROUP_FACILITY)
-            
-            # ارسال تصاویر
-            for img_url in images:
-                caption = f"📋 {name}"
-                send_photo(img_url, caption)
+            # اگر تصویر دارد، تصویر با caption کامل ارسال شود
+            if images:
+                for img_url in images:
+                    send_photo(img_url, msg)
+                    if is_facility:
+                        send_photo(img_url, msg, TELEGRAM_GROUP_FACILITY)
+            else:
+                # بدون تصویر - فقط متن
+                send_telegram(msg)
                 if is_facility:
-                    send_photo(img_url, caption, TELEGRAM_GROUP_FACILITY)
+                    send_telegram(msg, TELEGRAM_GROUP_FACILITY)
         else:
             msg=f"🔔 **فعالیت جدید**\n\n📋 **تسک:** {name}\n\n🕐 {fmt(None)}"
             send_telegram(msg)
