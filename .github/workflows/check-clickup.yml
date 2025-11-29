@@ -1,3 +1,17 @@
+<<<<<<< HEAD
+name: ClickUp to Telegram
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check ClickUp Comments
+=======
 name: ClickUp to Telegram Notifications
 
 on:
@@ -12,12 +26,69 @@ jobs:
     
     steps:
       - name: Check ClickUp and Send to Telegram
+>>>>>>> e646a5e (GitHub Actions only - check every 5 minutes)
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           CLICKUP_API_TOKEN: ${{ secrets.CLICKUP_API_TOKEN }}
           CLICKUP_TEAM_ID: ${{ secrets.CLICKUP_TEAM_ID }}
         run: |
+<<<<<<< HEAD
+          python3 << 'EOF'
+          import json, os, urllib.request, urllib.parse
+          from datetime import datetime
+
+          def jalali(gy,gm,gd):
+              g=[0,31,59,90,120,151,181,212,243,273,304,334]
+              jy=979 if gy>1600 else 0
+              gy-=1600 if gy>1600 else 621
+              gy2=gy+1 if gm>2 else gy
+              d=(365*gy)+(gy2+3)//4-(gy2+99)//100+(gy2+399)//400-80+gd+g[gm-1]
+              jy+=33*(d//12053);d%=12053
+              jy+=4*(d//1461);d%=1461
+              if d>365:jy+=(d-1)//365;d=(d-1)%365
+              jm,jd=(1+d//31,1+d%31) if d<186 else (7+(d-186)//30,1+(d-186)%30)
+              return jy,jm,jd
+
+          def fmt(ts):
+              try:
+                  ts=int(ts)
+                  if ts>1e10:ts/=1000
+                  dt=datetime.fromtimestamp(ts)
+                  jy,jm,jd=jalali(dt.year,dt.month,dt.day)
+                  m=["فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند"]
+                  return f"{jd} {m[jm-1]} {jy} - ساعت {dt.strftime('%H:%M')}"
+              except:return "نامشخص"
+
+          def send(txt):
+              t,c=os.environ.get('TELEGRAM_BOT_TOKEN'),os.environ.get('TELEGRAM_CHAT_ID')
+              if not t:return
+              d=urllib.parse.urlencode({'chat_id':c,'text':txt,'parse_mode':'Markdown'}).encode()
+              urllib.request.urlopen(f"https://api.telegram.org/bot{t}/sendMessage",d,timeout=10)
+
+          def api(url):
+              r=urllib.request.Request(url,headers={'Authorization':os.environ.get('CLICKUP_API_TOKEN')})
+              return json.loads(urllib.request.urlopen(r,timeout=10).read())
+
+          team=os.environ.get('CLICKUP_TEAM_ID')
+          ago=int(datetime.now().timestamp()*1000)-300000
+          tasks=api(f"https://api.clickup.com/api/v2/team/{team}/task?limit=15").get('tasks',[])
+          n=0
+          for t in tasks:
+              for c in api(f"https://api.clickup.com/api/v2/task/{t['id']}/comment").get('comments',[])[:3]:
+                  if int(c.get('date',0))>ago:
+                      u=c.get('user',{})
+                      send(f"📋 **در تسک «{t['name']}»**
+
+👤 **{u.get('username') or u.get('email','?')}** نوشته:
+
+💬 {c.get('comment_text','')}
+
+🕐 {fmt(c.get('date'))}")
+                      n+=1
+          print(f"✅ {n} کامنت جدید")
+          EOF
+=======
           #!/bin/bash
           
           # تابع تبدیل به تاریخ شمسی
@@ -178,3 +249,4 @@ jobs:
           print(f"📊 {new_comments} کامنت جدید یافت شد")
           PYTHON
 
+>>>>>>> e646a5e (GitHub Actions only - check every 5 minutes)
