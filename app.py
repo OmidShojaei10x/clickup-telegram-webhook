@@ -1,18 +1,20 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import os, json, urllib.request, urllib.parse
+import os, json, urllib.request, urllib.parse, hashlib, hmac
 from datetime import datetime, timedelta, timezone
 
 # تایم‌زون ایران (UTC+3:30)
 IRAN_TZ = timezone(timedelta(hours=3, minutes=30))
 
 app = Flask(__name__)
-CORS(app)
+# CORS فقط برای ClickUp
+CORS(app, origins=["https://app.clickup.com", "https://api.clickup.com"])
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "918656204")
-TELEGRAM_GROUP_FACILITY = os.getenv("TELEGRAM_GROUP_FACILITY", "-1002914241474")  # گروه Facility & Partnership
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+TELEGRAM_GROUP_FACILITY = os.getenv("TELEGRAM_GROUP_FACILITY")
 CLICKUP_API_TOKEN = os.getenv("CLICKUP_API_TOKEN")
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")  # برای احراز هویت webhook
 
 def jalali(gy,gm,gd):
     g=[0,31,59,90,120,151,181,212,243,273,304,334]
@@ -124,8 +126,23 @@ def home():
 def health():
     return jsonify({"status":"healthy"})
 
+def verify_webhook(req):
+    """بررسی امضای webhook از ClickUp"""
+    if not WEBHOOK_SECRET:
+        return True  # اگر secret تنظیم نشده، همه درخواست‌ها قبول شود
+    signature = req.headers.get('X-Signature')
+    if not signature:
+        return False
+    body = req.get_data()
+    expected = hmac.new(WEBHOOK_SECRET.encode(), body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(signature, expected)
+
 @app.route("/webhook",methods=["POST"])
 def webhook():
+    # بررسی امنیتی
+    if not verify_webhook(request):
+        return jsonify({"error":"Unauthorized"}), 401
+    
     data=request.json or {}
     if "payload" in data:
         p=data["payload"]
@@ -170,6 +187,10 @@ def webhook():
 
 @app.route("/test")
 def test():
+    # فقط با پارامتر مخفی کار کند
+    secret = request.args.get('key')
+    if secret != os.getenv("TEST_KEY", "clickup2025"):
+        return jsonify({"error":"Forbidden"}), 403
     send_telegram(f"🧪 **تست سرور**\n\n✅ سرور ابری فعال است!\n\n🕐 {fmt(None)}")
     return jsonify({"status":"ok"})
 
