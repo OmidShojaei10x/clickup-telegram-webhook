@@ -118,6 +118,10 @@ def is_facility_task(task_data):
                             return True
     return False
 
+def get_task_link(task_id):
+    """ساخت لینک تسک ClickUp"""
+    return f"https://app.clickup.com/t/{task_id}"
+
 @app.route("/")
 def home():
     return jsonify({"status":"running","service":"ClickUp Webhook"})
@@ -162,7 +166,8 @@ def webhook():
             if not comment_text and images:
                 comment_text = "📷 تصویر"
             
-            msg=f"🟢 **تسک:** {name}\n\n💬 **کامنت:** {comment_text}\n\n👤 **نوشته:** {u.get('username') or u.get('email','?')}\n\n🕐 **تاریخ:** {fmt(c.get('date'))}"
+            task_link = get_task_link(tid)
+            msg=f"🟢 **تسک:** {name}\n\n💬 **کامنت:** {comment_text}\n\n👤 **نوشته:** {u.get('username') or u.get('email','?')}\n\n🕐 **تاریخ:** {fmt(c.get('date'))}\n\n🔗 [مشاهده تسک]({task_link})"
             
             # اگر تصویر دارد، تصویر با caption کامل ارسال شود
             if images:
@@ -176,7 +181,8 @@ def webhook():
                 if is_facility:
                     send_telegram(msg, TELEGRAM_GROUP_FACILITY)
         else:
-            msg=f"🔔 **فعالیت جدید**\n\n📋 **تسک:** {name}\n\n🕐 {fmt(None)}"
+            task_link = get_task_link(tid)
+            msg=f"🔔 **فعالیت جدید**\n\n📋 **تسک:** {name}\n\n🕐 **تاریخ:** {fmt(None)}\n\n🔗 [مشاهده تسک]({task_link})"
             send_telegram(msg)
             if is_facility_task(task_data):
                 send_telegram(msg, TELEGRAM_GROUP_FACILITY)
