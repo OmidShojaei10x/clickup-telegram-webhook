@@ -80,27 +80,56 @@ def get_task_link(task_id):
 #  📤 توابع ارسال پیام
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def send_telegram(text, chat_id=None):
-    if not TELEGRAM_BOT_TOKEN:return False
-    target_chat = chat_id or TELEGRAM_CHAT_ID
-    if not target_chat:return False
-    d=urllib.parse.urlencode({'chat_id':target_chat,'text':text,'parse_mode':'Markdown'}).encode()
+def make_request(method, params):
+    if not TELEGRAM_BOT_TOKEN: return None
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/{method}"
+    headers = {'Content-Type': 'application/json'}
     try:
-        urllib.request.urlopen(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",d,timeout=10)
-        return True
-    except:
-        return False
+        req = urllib.request.Request(url, data=json.dumps(params).encode(), headers=headers)
+        with urllib.request.urlopen(req, timeout=10) as response:
+            return json.loads(response.read())
+    except Exception as e:
+        print(f"Telegram Error: {e}")
+        return None
 
-def send_photo(photo_url, caption, chat_id=None):
-    if not TELEGRAM_BOT_TOKEN:return False
+def send_telegram(text, chat_id=None, reply_markup=None):
     target_chat = chat_id or TELEGRAM_CHAT_ID
-    if not target_chat:return False
-    d=urllib.parse.urlencode({'chat_id':target_chat,'photo':photo_url,'caption':caption,'parse_mode':'Markdown'}).encode()
-    try:
-        urllib.request.urlopen(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto",d,timeout=30)
-        return True
-    except:
-        return False
+    if not target_chat: return False
+    params = {
+        'chat_id': target_chat,
+        'text': text,
+        'parse_mode': 'Markdown'
+    }
+    if reply_markup:
+        params['reply_markup'] = reply_markup
+    return make_request("sendMessage", params) is not None
+
+def send_photo(photo_url, caption, chat_id=None, reply_markup=None):
+    target_chat = chat_id or TELEGRAM_CHAT_ID
+    if not target_chat: return False
+    params = {
+        'chat_id': target_chat,
+        'photo': photo_url,
+        'caption': caption,
+        'parse_mode': 'Markdown'
+    }
+    if reply_markup:
+        params['reply_markup'] = reply_markup
+    return make_request("sendPhoto", params) is not None
+
+def edit_message_reply_markup(chat_id, message_id, reply_markup=None):
+    params = {
+        'chat_id': chat_id,
+        'message_id': message_id
+    }
+    if reply_markup:
+        params['reply_markup'] = reply_markup
+    return make_request("editMessageReplyMarkup", params)
+
+def answer_callback_query(callback_query_id, text=None):
+    params = {'callback_query_id': callback_query_id}
+    if text: params['text'] = text
+    return make_request("answerCallbackQuery", params)
 
 def send_to_team(team_key, text, photo_url=None):
     """ارسال پیام به گروه تیم"""
@@ -192,16 +221,13 @@ def get_team_from_task(task_data):
 
 def build_comment_message(task_name, task_id, comment_text, username, date, team_config=None):
     """ساخت پیام کامنت جدید"""
-    team_line = ""
-    if team_config:
-        emoji = team_config.get("emoji", "📋")
-        team_name = team_config.get("name", "")
-        team_line = f"{emoji} **تیم:** {team_name}\n\n"
+    # ❌ حذف خط تیم طبق درخواست کاربر
     
     task_link = get_task_link(task_id)
     
+    # ✅ بلد کردن عنوان‌ها
     msg = f"💬 **کامنت جدید**\n\n"
-    msg += team_line
+    # msg += team_line  <-- Removed
     msg += f"📋 **تسک:** {task_name}\n\n"
     msg += f"💬 **کامنت:** {comment_text}\n\n"
     msg += f"👤 **نوشته:** {username}\n\n"
@@ -214,16 +240,11 @@ def build_comment_message(task_name, task_id, comment_text, username, date, team
 
 def build_activity_message(task_name, task_id, team_config=None):
     """ساخت پیام فعالیت جدید"""
-    team_line = ""
-    if team_config:
-        emoji = team_config.get("emoji", "📋")
-        team_name = team_config.get("name", "")
-        team_line = f"{emoji} **تیم:** {team_name}\n\n"
+    # ❌ حذف خط تیم طبق درخواست کاربر
     
     task_link = get_task_link(task_id)
     
     msg = f"🔔 **فعالیت جدید**\n\n"
-    msg += team_line
     msg += f"📋 **تسک:** {task_name}\n\n"
     msg += f"🕐 **تاریخ:** {fmt(None)}\n\n"
     
@@ -307,35 +328,138 @@ def webhook():
                 comment.get('date'), team_config
             )
             
-            # ارسال به گروه پیش‌فرض
-            if GENERAL.get("also_send_to_default", True):
-                if images:
-                    for img_url in images:
-                        send_photo(img_url, msg)
-                else:
-                    send_telegram(msg)
+            # دکمه‌های ارسال
+            reply_markup = None
+            if team_key and team_config and team_config.get("enabled"):
+                 reply_markup = {
+                    "inline_keyboard": [
+                        [
+                            {"text": "ارسال به تیم 📤", "callback_data": f"send:{team_key}"},
+                            {"text": "ادیت و ارسال ✏️", "callback_data": f"edit:{team_key}"}
+                        ]
+                    ]
+                }
             
-            # ارسال به گروه تیم
-            if team_key:
-                if images:
-                    for img_url in images:
-                        send_to_team(team_key, msg, img_url)
-                else:
-                    send_to_team(team_key, msg)
+            # ارسال به ادمین (همیشه)
+            if images:
+                for img_url in images:
+                    send_photo(img_url, msg, reply_markup=reply_markup)
+            else:
+                send_telegram(msg, reply_markup=reply_markup)
+            
+            # ❌ ارسال خودکار به تیم حذف شد (طبق فلو جدید)
         
         else:
             # فعالیت جدید (بدون کامنت)
             msg = build_activity_message(task_name, task_id, team_config)
-            
-            if GENERAL.get("also_send_to_default", True):
-                send_telegram(msg)
-            
-            if team_key:
-                send_to_team(team_key, msg)
+            send_telegram(msg) # فقط به ادمین
     
     elif "body" in data:
         send_telegram(f"🧪 **تست Webhook**\n\n✅ سرور فعال است!\n\n🕐 {fmt(None)}")
     
+    return jsonify({"status": "ok"})
+
+
+@app.route("/telegram", methods=["POST"])
+def telegram_webhook():
+    """هندلر وب‌هوک تلگرام برای دریافت دکمه‌ها و پیام‌ها"""
+    update = request.json
+    if not update:
+        return jsonify({"status": "no data"})
+
+    # 1. هندل کردن دکمه‌ها (Callback Query)
+    if "callback_query" in update:
+        cb = update["callback_query"]
+        cb_id = cb["id"]
+        data = cb.get("data", "")
+        message = cb.get("message", {})
+        chat_id = message.get("chat", {}).get("id")
+        message_id = message.get("message_id")
+        
+        # تشخیص اکشن و تیم
+        if ":" in data:
+            action, team_key = data.split(":", 1)
+            team = TEAMS.get(team_key)
+            
+            if not team:
+                answer_callback_query(cb_id, "❌ تیم یافت نشد")
+                return jsonify({"status": "team not found"})
+
+            if action == "send":
+                # ارسال مستقیم متن موجود به تیم
+                text_to_send = message.get("text") or message.get("caption")
+                # اگر عکس بود
+                photo = message.get("photo")
+                photo_url = None
+                if photo:
+                     # گرفتن بزرگترین سایز عکس
+                     photo_id = photo[-1]["file_id"]
+                     photo_url = photo_id # تلگرام file_id را در sendPhoto قبول می‌کند
+
+                # ارسال به تیم
+                if photo_url:
+                    success = send_photo(photo_url, text_to_send, team["chat_id"])
+                else:
+                    success = send_telegram(text_to_send, team["chat_id"])
+                
+                if success:
+                    answer_callback_query(cb_id, "✅ ارسال شد")
+                    # حذف دکمه‌ها و اضافه کردن تیک
+                    edit_message_reply_markup(chat_id, message_id, reply_markup=None)
+                    # آپدیت متن پیام ادمین برای نشان دادن وضعیت (اختیاری، ساده‌ترین کار حذف دکمه است)
+                else:
+                    answer_callback_query(cb_id, "❌ خطا در ارسال")
+
+            elif action == "edit":
+                # درخواست متن جدید از ادمین (ForceReply)
+                team_name = team.get("name")
+                prompt_msg = f"✍️ لطفا متن جدید برای ارسال به تیم **{team_name}** را ریپلای کنید:"
+                
+                # ارسال پیام ForceReply
+                force_reply = {
+                    "force_reply": True,
+                    "input_field_placeholder": f"متن برای {team_name}..."
+                }
+                
+                # ما team_key را در متن پیام مخفی می‌کنیم یا در دیتابیس نگه می‌داریم.
+                # چون دیتابیس نداریم، از یک ترفند استفاده می‌کنیم:
+                # نام تیم را در متن پیام می‌آوریم و در هندلر پیام آن را پیدا می‌کنیم.
+                # بهتر: team_key را به صورت مخفی (invisible char) یا فقط با مچ کردن نام تیم پیدا کنیم.
+                # راه ساده: در متن پیام بگذاریم: "متن جدید برای ارسال به تیم {team_name} (کد: {team_key})"
+                
+                prompt_msg = f"✍️ متن ویرایش شده برای تیم **{team_name}** را در پاسخ به این پیام بنویسید.\n\n(ID: {team_key})"
+                
+                make_request("sendMessage", {
+                    "chat_id": chat_id,
+                    "text": prompt_msg,
+                    "reply_markup": force_reply
+                })
+                answer_callback_query(cb_id, "📝 منتظر متن جدید...")
+
+    # 2. هندل کردن پیام‌های ریپلای شده (Message)
+    elif "message" in update:
+        msg = update["message"]
+        reply = msg.get("reply_to_message")
+        
+        if reply and "text" in reply:
+            reply_text = reply["text"]
+            # چک کردن الگوی پیام ما
+            if "متن ویرایش شده برای تیم" in reply_text and "ID:" in reply_text:
+                # استخراج team_key
+                try:
+                    # فرمت: ... (ID: team_key)
+                    team_key = reply_text.split("(ID: ")[1].split(")")[0]
+                    new_text = msg.get("text")
+                    
+                    team = TEAMS.get(team_key)
+                    if team and new_text:
+                        if send_telegram(new_text, team["chat_id"]):
+                            send_telegram("✅ پیام ویرایش شده با موفقیت ارسال شد.", msg["chat"]["id"])
+                        else:
+                            send_telegram("❌ خطا در ارسال به تیم.", msg["chat"]["id"])
+                except:
+                    pass
+
     return jsonify({"status": "ok"})
 
 
